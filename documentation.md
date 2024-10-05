@@ -891,3 +891,22 @@ def update_favorite_page(user_id, book_isbn, current_page):
         # Write the updated favorites back to the JSON file
         with open(FAVORITES_JSON_PATH, 'w') as file:
             json.dump(all_favorites, file, indent=4)
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+"""
+Database Initialization Module
+
+- This module is responsible for initializing the database by creating the necessary tables.
+
+Author: Your Name
+Date: 06.10.2024
+Version: 0.1.0
+License: Free
+"""
+
+import database
+
+# This function creates the necessary tables
+database.create_tables()
+print("Database tables were successfully created")
