@@ -280,7 +280,132 @@ def add_favorite():
 
     return redirect('/favorites')
 
+@app.route('/test_json_favorites', methods=['GET'])
+def test_json_favorites():
+    """
+    Test route to display the contents of the favorites JSON file.
 
+    Returns:
+        Renders a template displaying the contents of the JSON file.
+
+    Tests:
+        1. **Display Favorites JSON**:
+            - Input: GET request.
+            - Expected Outcome: The function should return the rendered test_json.html template with the contents of the favorites JSON file.
+
+        2. **No Favorites Handling**:
+            - Input: GET request with an empty favorites JSON.
+            - Expected Outcome: The function should still return the rendered test_json.html template, but the favorites_data variable should be empty.
+    """
+    favorites_data = json_storage.load_all_favorites()
+    return render_template('test_json.html', favorites_data=favorites_data)
+
+
+@app.route('/bookmark', methods=['GET'])
+def bookmark():
+    """
+    Displays the user's bookmarks.
+
+    Returns:
+        Renders the bookmarks page with the user's bookmarked books.
+
+    Tests:
+        1. **Bookmarks Retrieval**:
+            - Input: Valid user session.
+            - Expected Outcome: The function should return rendered bookmarks.html with the user's bookmarked books.
+
+        2. **Unauthorized Access Handling**:
+            - Input: GET request without a user logged in.
+            - Expected Outcome: The function should redirect to the login page if the user is not logged in.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect('/login')
+
+    # Load all favorites and filter for the current user
+    all_favorites = json_storage.load_all_favorites()
+    favorites = all_favorites.get(str(user_id), [])
+
+    return render_template('bookmarks.html', favorites=favorites)
+
+
+@app.route('/update_favorite_page', methods=['POST'])
+def update_favorite_page():
+    """
+    Updates the current page for a favorite book.
+
+    POST:
+        Updates the current page number for a book in the user's favorites.
+
+    Returns:
+        Redirects to the bookmarks page with the updated page number.
+
+    Tests:
+        1. **Successful Page Update**:
+            - Input: Valid user session and valid ISBN with current page number.
+            - Expected Outcome: The function should update the current page in the JSON file and redirect to bookmarks.html with updated data.
+
+        2. **Invalid Page Number Handling**:
+            - Input: Valid user session, but invalid current page input (non-integer).
+            - Expected Outcome: The function should return a 400 status code with an error message "Invalid page number".
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect('/login')  # User must be logged in
+
+    # Get data from the form
+    book_isbn = request.form['book_isbn']
+    current_page = request.form['current_page']
+
+    try:
+        current_page = int(current_page)  # Ensure page number is a valid integer
+    except ValueError:
+        return "Invalid page number", 400
+
+    # Update the current page in the JSON file
+    json_storage.update_favorite_page(user_id, book_isbn, current_page)
+
+    # Reload the page with the updated data
+    favorites = json_storage.load_user_favorites(user_id)
+    return render_template('bookmarks.html', favorites=favorites)
+
+
+@app.route('/learnings', methods=['GET', 'POST'])
+def learnings():
+    """
+    Displays and saves learning notes for a user's favorite books.
+
+    POST:
+        Saves learning notes for a book in the user's favorites.
+
+    Returns:
+        Renders the learning notes page.
+
+    Tests:
+        1. **Save Learning Notes**:
+            - Input: Valid user session and valid book ISBN with learning notes.
+            - Expected Outcome: The function should save the learning notes and redirect to the learnings page.
+
+        2. **Unauthorized Access Handling**:
+            - Input: GET request without a user logged in.
+            - Expected Outcome: The function should redirect to the login page if the user is not logged in.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect('/login')
+
+    if request.method == 'POST':
+        book_isbn = request.form['book_isbn']
+        learning = request.form['learning']
+
+        json_storage.save_favorite_learning(user_id, book_isbn, learning)
+
+        return redirect('/learnings')
+
+    favorites = json_storage.load_user_favorites(user_id)
+
+    return render_template('learnings.html', favorites=favorites)
+    
 if __name__ == '__main__':
     app.run(debug=True)
 
