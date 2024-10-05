@@ -899,7 +899,7 @@ Database Initialization Module
 
 - This module is responsible for initializing the database by creating the necessary tables.
 
-Author: Your Name
+Author: Paul, Tim, Thang
 Date: 06.10.2024
 Version: 0.1.0
 License: Free
