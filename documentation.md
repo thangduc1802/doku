@@ -10,124 +10,144 @@ Date: 06.10.2024
 Version: 0.1.0 (major.minor.bugfix)
 License: Free
 """
-
 from flask import Flask, render_template, request, redirect, session, url_for
+from flask.cli import load_dotenv
 from backend import database, google_books_api, json_storage
+import logging
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # For session management
+"""We used one static hardcoded key, for developing reasons"""
+app.secret_key = ('VJ8_zl5jBLD2Rh0KM9M8xv1S7Jh7-UzXGvHb0ljhA1x7x3u4a6mA')
 
-# Create tables if they do not exist
-with app.app_context():
-    database.create_tables()
-
+# Set up logging configuration
+logging.basicConfig(filename='application.log', 
+                    level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 @app.route('/')
 def index():
     """
-    Displays the homepage.
+    Displays the homepage with streak information if the user is logged in.
     
     Returns:
         Rendered homepage (index.html).
 
     Tests:
-        1. **Homepage Rendering**:
-            - Input: None.
-            - Expected Outcome: The function should return the rendered index.html template without any errors.
+        1. **Logged-in User**:
+            - Input: A user is logged in (user_id exists in the session).
+            - Expected Outcome: The homepage is displayed, and streak data is correctly fetched and shown.
 
-        2. **Status Code Check**:
-            - Input: None.
-            - Expected Outcome: The function should return a status code of 200 indicating successful rendering.
+        2. **Anonymous User**:
+            - Input: No user is logged in (session does not contain a user_id).
+            - Expected Outcome: The homepage is displayed without streak data.
     """
-    return render_template('index.html')
+    user_id = session.get('user_id')
+
+    # Initialize streak data as empty
+    streak_data = None
+
+    # If the user is logged in, get the streak data
+    if user_id:
+        streak_data = database.get_user_streak_data(user_id)
+        logging.info(f"Displayed streak data for user {user_id}.")
+    else:
+        logging.info("Homepage accessed without login.")
+
+    return render_template('index.html', streak_data=streak_data)
+
+
 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
-    Handles user registration.
-
-    POST:
-        Registers the user with the provided username and password.
-
-    Returns:
-        Redirects to the login page after registration, or renders the registration form if a GET request is made.
-
     Tests:
-        1. **User Registration**:
-            - Input: Valid username and password via POST request.
-            - Expected Outcome: The function should register the user and redirect to the login page.
+        1. **Successful Registration**:
+            - Input: A valid username and password.
+            - Expected Outcome: The user is registered, and the page redirects to the login page.
 
         2. **Registration Form Rendering**:
-            - Input: GET request.
-            - Expected Outcome: The function should return the rendered registration form (register.html).
+            - Input: A GET request to the registration page.
+            - Expected Outcome: The registration form is displayed.
+
     """
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        # Register the user
+        
+        # Benutzer registrieren
         database.register_user(username, password)
-
-        # Redirect the user to the login page
         return redirect('/login')
-
+    
     return render_template('register.html')
+
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """
-    Handles user login.
-
-    POST:
-        Authenticates the user based on the provided username and password.
-    
-    Returns:
-        Redirects to the search page if successful, otherwise reloads the login page with an error.
-
     Tests:
         1. **Successful Login**:
-            - Input: Valid username and password via POST request.
-            - Expected Outcome: The function should authenticate the user and redirect to the search page.
+            - Input: Valid username and password.
+            - Expected Outcome: The user is authenticated and redirected to the homepage.
 
-        2. **Login Failure Handling**:
-            - Input: Invalid username and password via POST request.
-            - Expected Outcome: The function should return an error message indicating login failure without redirecting.
+        2. **Failed Login**:
+            - Input: Invalid username or password.
+            - Expected Outcome: The login form is re-displayed with an error message.
     """
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
-        # Check if the user exists
+        
         user = database.authenticate_user(username, password)
         if user:
-            session['user_id'] = user[0]  # user[0] is the user's ID
-            return redirect('/search')
+            session['user_id'] = user[0]  # Store user ID in session
+            return redirect('/')
         else:
             return 'Login failed. Please check your username and password.'
-
+    
     return render_template('login.html')
+
+
+
+
+
+@app.route('/streaks')
+def streaks():
+    """
+    Tests:
+        1. **Logged-in User Access**:
+            - Input: A logged-in user attempts to access the streaks page.
+            - Expected Outcome: The streaks page is displayed.
+
+        2. **Unauthorized Access**:
+            - Input: A user who is not logged in tries to access the streaks page.
+            - Expected Outcome: The user is redirected to the login page with a warning logged.
+    """
+    if 'user_id' not in session:
+        logging.warning("User attempted to access streaks page without logging in.")
+        return "Log in to track your reading streaks."
+    
+    # Rest of your code to display streaks
+    return render_template('streaks.html', user_id=session['user_id'])
+
 
 
 @app.route('/logout')
 def logout():
     """
-    Logs out the user by clearing the session.
-
-    Returns:
-        Redirects to the homepage.
-
     Tests:
-        1. **Session Clearing**:
-            - Input: None.
-            - Expected Outcome: The session should be cleared (user_id should not exist).
+        1. **Successful Logout**:
+            - Input: A logged-in user clicks the logout button.
+            - Expected Outcome: The user is logged out, session is cleared, and they are redirected to the homepage.
 
-        2. **Redirecting to Homepage**:
-            - Input: None.
-            - Expected Outcome: The function should redirect to the homepage (index route).
+        2. **Logging**:
+            - Input: A user logs out.
+            - Expected Outcome: An informational log entry is created, noting the user has logged out.
     """
     session.pop('user_id', None)
+    logging.info("User logged out.")
     return redirect('/')
 
 
@@ -135,23 +155,26 @@ def logout():
 def search():
     """
     Displays the search form and processes the user's search query.
-
+    
     POST:
         Retrieves books from the Google Books API based on user input (field and topic).
-    
+
     Returns:
         Renders the search results page if successful or the search form for a GET request.
 
+    """
     Tests:
-        1. **Search Results Retrieval**:
-            - Input: Valid field and topic via POST request.
-            - Expected Outcome: The function should return rendered results.html with books based on the search query.
+        1. **Search Query**:
+            - Input: A logged-in user submits a search form with a field of interest and topic.
+            - Expected Outcome: Books matching the search criteria are fetched from Google Books API and displayed.
 
-        2. **Unauthorized Access Handling**:
-            - Input: GET request without a user logged in.
-            - Expected Outcome: The function should redirect to the login page.
+        2. **Unauthorized Access**:
+            - Input: A user tries to access the search page without logging in.
+            - Expected Outcome: The user is redirected to the login page with a warning logged.
+    """
     """
     if 'user_id' not in session:
+        logging.warning("Unauthorized access to search page.")
         return redirect('/login')  # User must be logged in
 
     if request.method == 'POST':
@@ -160,8 +183,7 @@ def search():
 
         # Retrieve books from the Google Books API based on search criteria
         books = google_books_api.search_books(field_of_interest, specific_topic)
-
-        # Display results
+        logging.info(f"Search query '{field_of_interest}' with topic '{specific_topic}' returned {len(books)} results.")
         return render_template('results.html', books=books, category=field_of_interest)
 
     return render_template('search.html')
@@ -171,18 +193,18 @@ def search():
 def favorites():
     """
     Displays the user's favorite books.
-
+    
     Returns:
         Renders the favorites page with the user's favorite books filtered by category if applicable.
 
     Tests:
-        1. **Favorites Retrieval**:
-            - Input: Valid user session.
-            - Expected Outcome: The function should return rendered favorites.html with the user's favorite books.
+        1. **Favorites Display**:
+            - Input: A logged-in user has favorite books stored.
+            - Expected Outcome: The user's favorites are correctly loaded and displayed.
 
-        2. **Category Filtering**:
-            - Input: Valid user session and category filter in the query string.
-            - Expected Outcome: The function should return rendered favorites.html with only books that match the specified category.
+        2. **Category Filter**:
+            - Input: A category filter is applied to the favorite books list.
+            - Expected Outcome: Only favorite books from the selected category are shown.
     """
     user_id = session.get('user_id')
 
@@ -195,6 +217,7 @@ def favorites():
     if category_filter:
         favorites_json = [book for book in favorites_json if book.get('category') == category_filter]
 
+    logging.info(f"Favorites displayed for user {user_id} with category filter '{category_filter}'.")
     return render_template('favorites.html', favorites=favorites_json, category_filter=category_filter)
 
 
@@ -202,7 +225,7 @@ def favorites():
 def remove_favorites_view():
     """
     Handles removing selected favorite books for a user.
-
+    
     POST:
         Removes the books with the selected ISBNs from the user's favorites list.
 
@@ -210,31 +233,31 @@ def remove_favorites_view():
         Redirects to the favorites page.
 
     Tests:
-        1. **Favorites Removal**:
-            - Input: Valid user session and selected ISBNs.
-            - Expected Outcome: The function should remove the specified books from the user's favorites and redirect to the favorites page.
+        1. **Removing Favorites**:
+            - Input: A logged-in user selects books to remove from their favorites.
+            - Expected Outcome: The selected books are removed from the user's favorites, and the page reloads.
 
-        2. **Unauthorized Removal Handling**:
-            - Input: POST request without a logged-in user.
-            - Expected Outcome: The function should redirect to the login page.
+        2. **Unauthorized Access**:
+            - Input: A non-logged-in user attempts to remove favorite books.
+            - Expected Outcome: The user is redirected to the login page with a warning logged.
     """
     if 'user_id' in session:
         user_id = session['user_id']
         selected_isbns = request.form.getlist('selected_books')
 
         if selected_isbns:
-            # Remove selected favorites from the JSON file
             json_storage.remove_favorites(user_id, selected_isbns)
+            logging.info(f"Removed favorites for user {user_id}: {selected_isbns}")
 
         return redirect(url_for('favorites'))
+    logging.warning("Unauthorized attempt to remove favorites.")
     return redirect(url_for('login'))
-
 
 @app.route('/add_favorite', methods=['POST'])
 def add_favorite():
     """
     Adds selected books to the user's favorites.
-
+    
     POST:
         Saves the selected books (with title, author, ISBN, publication year) to the user's favorites list.
 
@@ -242,18 +265,19 @@ def add_favorite():
         Redirects to the favorites page.
 
     Tests:
-        1. **Adding Favorite Books**:
-            - Input: Valid book details via POST request.
-            - Expected Outcome: The function should save the book details to the user's favorites and redirect to the favorites page.
+        1. **Successful Addition**:
+            - Input: A logged-in user selects books and adds them to their favorites.
+            - Expected Outcome: The selected books are added to the user's favorites, and the page redirects to the favorites page.
 
-        2. **Handling Missing Data**:
-            - Input: Missing one or more required fields (title, author, ISBN, publication year).
-            - Expected Outcome: The function should return a 400 status code with an error message indicating missing data.
+        2. **Missing Data**:
+            - Input: A book with missing title, author, ISBN, or publication year is added.
+            - Expected Outcome: An error message is returned with a 400 status code, and the favorite is not added.
     """
     user_id = session.get('user_id')
 
     selected_books = request.form.getlist('selected_books')
     if not selected_books:
+        logging.error("No books selected to add to favorites.")
         return "No books selected.", 400
 
     for index in selected_books:
@@ -264,6 +288,7 @@ def add_favorite():
         category = request.form.get(f'category_{index}', 'Uncategorized')
 
         if not all([title, author, isbn, publication_year]):
+            logging.error("Missing data for one of the books.")
             return "Missing data for one of the books.", 400
 
         # Prepare book details
@@ -275,29 +300,31 @@ def add_favorite():
             'category': category
         }
 
-        # Save the book to JSON
         json_storage.save_favorite(user_id, book_details)
+        logging.info(f"Added favorite book '{title}' for user {user_id}.")
 
     return redirect('/favorites')
+
 
 @app.route('/test_json_favorites', methods=['GET'])
 def test_json_favorites():
     """
     Test route to display the contents of the favorites JSON file.
-
+    
     Returns:
         Renders a template displaying the contents of the JSON file.
 
     Tests:
-        1. **Display Favorites JSON**:
-            - Input: GET request.
-            - Expected Outcome: The function should return the rendered test_json.html template with the contents of the favorites JSON file.
+        1. **Display JSON Data**:
+            - Input: A logged-in user accesses the test route.
+            - Expected Outcome: The contents of the JSON favorites file are correctly displayed.
 
-        2. **No Favorites Handling**:
-            - Input: GET request with an empty favorites JSON.
-            - Expected Outcome: The function should still return the rendered test_json.html template, but the favorites_data variable should be empty.
+        2. **Logging**:
+            - Input: A user accesses the test route.
+            - Expected Outcome: An info log is generated, noting that the JSON favorites data was displayed.
     """
     favorites_data = json_storage.load_all_favorites()
+    logging.info("Displayed test JSON favorites data.")
     return render_template('test_json.html', favorites_data=favorites_data)
 
 
@@ -305,52 +332,49 @@ def test_json_favorites():
 def bookmark():
     """
     Displays the user's bookmarks.
-
+    
     Returns:
         Renders the bookmarks page with the user's bookmarked books.
 
     Tests:
-        1. **Bookmarks Retrieval**:
-            - Input: Valid user session.
-            - Expected Outcome: The function should return rendered bookmarks.html with the user's bookmarked books.
+        1. **Bookmarks Display**:
+            - Input: A logged-in user with bookmarked books.
+            - Expected Outcome: The user's bookmarks are correctly loaded and displayed.
 
-        2. **Unauthorized Access Handling**:
-            - Input: GET request without a user logged in.
-            - Expected Outcome: The function should redirect to the login page if the user is not logged in.
+        2. **Unauthorized Access**:
+            - Input: A non-logged-in user attempts to access bookmarks.
+            - Expected Outcome: The user is redirected to the login page with a warning logged.
     """
     user_id = session.get('user_id')
     if not user_id:
+        logging.warning("Unauthorized access to bookmarks.")
         return redirect('/login')
 
     # Load all favorites and filter for the current user
     all_favorites = json_storage.load_all_favorites()
     favorites = all_favorites.get(str(user_id), [])
 
+    logging.info(f"Displayed bookmarks for user {user_id}.")
     return render_template('bookmarks.html', favorites=favorites)
 
 
 @app.route('/update_favorite_page', methods=['POST'])
 def update_favorite_page():
     """
-    Updates the current page for a favorite book.
-
-    POST:
-        Updates the current page number for a book in the user's favorites.
-
-    Returns:
-        Redirects to the bookmarks page with the updated page number.
+    Updates the current page for a favorite book and the user's reading streak.
 
     Tests:
-        1. **Successful Page Update**:
-            - Input: Valid user session and valid ISBN with current page number.
-            - Expected Outcome: The function should update the current page in the JSON file and redirect to bookmarks.html with updated data.
+        1. **Valid Page Update**:
+            - Input: A valid page number is submitted for a favorite book.
+            - Expected Outcome: The page number is successfully updated in the JSON file.
 
-        2. **Invalid Page Number Handling**:
-            - Input: Valid user session, but invalid current page input (non-integer).
-            - Expected Outcome: The function should return a 400 status code with an error message "Invalid page number".
+        2. **Invalid Page Number**:
+            - Input: An invalid page number is submitted (non-integer).
+            - Expected Outcome: A 400 error is returned, and the page is not updated.
     """
     user_id = session.get('user_id')
     if not user_id:
+        logging.warning("Unauthorized attempt to update favorite page.")
         return redirect('/login')  # User must be logged in
 
     # Get data from the form
@@ -360,10 +384,15 @@ def update_favorite_page():
     try:
         current_page = int(current_page)  # Ensure page number is a valid integer
     except ValueError:
+        logging.error(f"Invalid page number '{current_page}' provided.")
         return "Invalid page number", 400
 
     # Update the current page in the JSON file
     json_storage.update_favorite_page(user_id, book_isbn, current_page)
+    logging.info(f"Updated page to {current_page} for book with ISBN {book_isbn} for user {user_id}.")
+
+    # Update the user's reading streak
+    database.update_reading_streak(user_id)
 
     # Reload the page with the updated data
     favorites = json_storage.load_user_favorites(user_id)
@@ -374,7 +403,7 @@ def update_favorite_page():
 def learnings():
     """
     Displays and saves learning notes for a user's favorite books.
-
+    
     POST:
         Saves learning notes for a book in the user's favorites.
 
@@ -382,16 +411,17 @@ def learnings():
         Renders the learning notes page.
 
     Tests:
-        1. **Save Learning Notes**:
-            - Input: Valid user session and valid book ISBN with learning notes.
-            - Expected Outcome: The function should save the learning notes and redirect to the learnings page.
+        1. **Saving Learning Note**:
+            - Input: A learning note is submitted for a favorite book.
+            - Expected Outcome: The learning note is saved to the JSON file, and the user is redirected to the learnings page.
 
-        2. **Unauthorized Access Handling**:
-            - Input: GET request without a user logged in.
-            - Expected Outcome: The function should redirect to the login page if the user is not logged in.
+        2. **Unauthorized Access**:
+            - Input: A non-logged-in user attempts to save a learning note.
+            - Expected Outcome: The user is redirected to the login page with a warning logged.
     """
     user_id = session.get('user_id')
     if not user_id:
+        logging.warning("Unauthorized access to learnings.")
         return redirect('/login')
 
     if request.method == 'POST':
@@ -399,15 +429,40 @@ def learnings():
         learning = request.form['learning']
 
         json_storage.save_favorite_learning(user_id, book_isbn, learning)
+        logging.info(f"Saved learning for book with ISBN {book_isbn} for user {user_id}.")
 
         return redirect('/learnings')
 
     favorites = json_storage.load_user_favorites(user_id)
-
     return render_template('learnings.html', favorites=favorites)
-    
+
+@app.route('/update_reading_progress', methods=['POST'])
+def update_reading_progress():
+    """
+    Updates the user's reading progress and their streak.
+
+    Tests:
+        1. **Valid Progress Update**:
+            - Input: A valid current page is submitted, and the reading streak is updated.
+            - Expected Outcome: The user's reading streak is updated based on the reading progress.
+
+        2. **Unauthorized Access**:
+            - Input: A non-logged-in user attempts to update reading progress.
+            - Expected Outcome: The user is redirected to the login page.
+    """
+    user_id = session.get('user_id')
+    if user_id:
+        current_page = request.form.get('current_page')
+        # Update the reading streak based on the progress
+        streak_data = database.update_reading_streak(user_id)
+        return redirect('/')
+    else:
+        return redirect('/login')
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 ---------------------------------------------------------------------------------------------------------------------------
