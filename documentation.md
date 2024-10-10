@@ -55,9 +55,6 @@ def index():
 
     return render_template('index.html', streak_data=streak_data)
 
-
-
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
@@ -80,9 +77,6 @@ def register():
         return redirect('/login')
     
     return render_template('register.html')
-
-
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -109,10 +103,6 @@ def login():
     
     return render_template('login.html')
 
-
-
-
-
 @app.route('/streaks')
 def streaks():
     """
@@ -131,8 +121,6 @@ def streaks():
     
     # Rest of your code to display streaks
     return render_template('streaks.html', user_id=session['user_id'])
-
-
 
 @app.route('/logout')
 def logout():
@@ -187,7 +175,6 @@ def search():
         return render_template('results.html', books=books, category=field_of_interest)
 
     return render_template('search.html')
-
 
 @app.route('/favorites', methods=['GET'])
 def favorites():
@@ -464,11 +451,10 @@ if __name__ == '__main__':
     app.run(debug=True)
 
 
-
 ---------------------------------------------------------------------------------------------------------------------------
 
 """
-Database Module
+Database Module (database.py)
 
 - This module handles the SQLite database connection and operations such as user registration, authentication, and table creation for a book recommendation application.
 
@@ -480,139 +466,366 @@ License: Free
 """
 
 import sqlite3
+import logging
+import bcrypt
+import hashlib
+from datetime import datetime, timedelta
 
-def connect_db():
+# Set up logging configuration
+logging.basicConfig(
+    filename='application.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+
+def connect_to_db():
     """
     Establishes a connection to the SQLite database.
 
     Returns:
         Connection object: SQLite connection to 'database.db'.
-
     Tests:
-        1. **Database Connection Success**:
-            - Input: Attempt to connect to the database.
-            - Expected Outcome: A connection object is returned if the database exists.
+        1. **Successful Connection**:
+            - Input: Valid database file (existing 'database.db').
+            - Expected Outcome: A connection object is returned, and a log message indicating successful connection is created.
         
-        2. **Database Connection Error Handling**:
-            - Input: (Simulate) Attempt to connect to a non-existent database.
-            - Expected Outcome: An exception should be raised indicating that the database cannot be found (this requires a mock or testing environment).
-    """
-    return sqlite3.connect('database.db')
+        2. **Connection Failure Handling**:
+            - Input: Invalid or non-existing database file.
+            - Expected Outcome: An exception is raised, and an error is logged.
 
-def create_tables():
     """
-    Creates the 'users' and 'reading_progress' tables in the database if they do not exist.
-    The 'users' table stores user information, and the 'reading_progress' table stores 
-    the user's reading progress with foreign keys linking to the 'users' and 'books' tables.
-    
+    try:
+        conn = sqlite3.connect('database.db')
+        logging.info("Database connection established successfully.")
+        return conn
+    except sqlite3.Error as e:
+        logging.error(f"Database connection failed: {e}")
+        raise e
+
+# User Management Functions
+
+def create_user_table():
+    """
+    Creates the 'users' table in the database if it does not exist.
+
     Returns:
         None
 
     Tests:
         1. **Table Creation Success**:
-            - Input: Call create_tables() when the database is empty.
-            - Expected Outcome: Tables 'users' and 'reading_progress' are created successfully without raising any errors.
+            - Input: Call create_user_table() when the database is empty.
+            - Expected Outcome: Tables 'users' are created successfully without raising any errors.
         
         2. **Table Existence Check**:
-            - Input: Call create_tables() twice in a row.
+            - Input: Call create_user_table() twice in a row.
             - Expected Outcome: The second call should not raise any errors, and the tables should remain unchanged.
     """
-    conn = connect_db()
+    conn = connect_to_db()
     cur = conn.cursor()
-
-    # Create 'users' table if it does not exist
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
-
-    # Create 'reading_progress' table if it does not exist
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS reading_progress (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            book_id INTEGER,
-            book_title TEXT,
-            date DATE DEFAULT (DATE('now')),
-            pages_read INTEGER NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (book_id) REFERENCES books(id)
-        )
-    ''')
-
-    conn.commit()
-    conn.close()
+    try:
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                password TEXT NOT NULL,
+                last_read_date DATE,
+                current_streak INTEGER DEFAULT 0,
+                longest_streak INTEGER DEFAULT 0
+            )
+        ''')
+        logging.info("Table 'users' created or already exists.")
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Error creating 'users' table: {e}")
+        raise e
+    finally:
+        conn.close()
 
 def register_user(username, password):
     """
-    Registers a new user by inserting their username and password into the 'users' table.
+    Registers a new user by storing the hashed username and password.
 
     Args:
-        username (str): The username of the new user.
-        password (str): The password of the new user.
-
-    Returns:
-        None
+        username (str): The user's username.
+        password (str): The user's password.
 
     Tests:
-        1. **User Registration Success**:
-            - Input: A valid username and password that do not already exist in the database.
-            - Expected Outcome: The user is successfully added to the 'users' table.
+        1. **Successful Registration**:
+            - Input: Valid username and password.
+            - Expected Outcome: User is added to the database, and no errors occur.
         
-        2. **Duplicate User Registration Handling**:
-            - Input: Attempt to register a username that already exists in the 'users' table.
-            - Expected Outcome: An exception or error message is raised, indicating that the username must be unique.
+        2. **Duplicate Registration Handling**:
+            - Input: Register a user with a username that already exists.
+            - Expected Outcome: An appropriate error message is logged, and no duplicate entries are created.
     """
-    conn = connect_db()
-    cur = conn.cursor()
-    
-    # Insert user data into the 'users' table
-    cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
-    
-    conn.commit()
-    conn.close()
+    hashed_username = hash_username(username)
+    hashed_password = hash_password(password)
+
+    try:
+        conn = connect_to_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            (hashed_username, hashed_password)
+        )
+        conn.commit()
+        logging.info(f"User '{username}' successfully registered.")
+    except sqlite3.Error as e:
+        logging.error(f"Error during user registration: {e}")
+    finally:
+        conn.close()
 
 def authenticate_user(username, password):
     """
-    Authenticates a user by checking the provided username and password against the 'users' table.
+    Authenticates the user by checking the hashed username and password.
 
     Args:
-        username (str): The username to be checked.
-        password (str): The password to be checked.
+        username (str): The user's username.
+        password (str): The user's password.
 
     Returns:
-        tuple: A tuple containing the user data (id, username, password) if authentication is successful.
-               None if the credentials are incorrect.
+        tuple or None: Returns the user tuple if authentication is successful, otherwise None.
 
     Tests:
         1. **Successful Authentication**:
-            - Input: A valid username and password that exist in the 'users' table.
-            - Expected Outcome: A tuple (id, username, password) is returned for the authenticated user.
+            - Input: Correct username and password.
+            - Expected Outcome: Returns user information if credentials match.
         
-        2. **Unsuccessful Authentication**:
-            - Input: A username and password that do not match any record in the 'users' table.
-            - Expected Outcome: None is returned, indicating failed authentication.
-        3. **Handling of Non-Existent User**:
-            - Input: An invalid username or an empty string for the username.
-            - Expected Outcome: None is returned, confirming that the user does not exist.
+        2. **Failed Authentication**:
+            - Input: Incorrect username or password.
+            - Expected Outcome: Returns None and logs a warning message.
     """
-    conn = connect_db()
+    try:
+        conn = connect_to_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id, username, password FROM users")
+        users = cur.fetchall()
+    except sqlite3.Error as e:
+        logging.error(f"Error during authentication: {e}")
+        return None
+    finally:
+        conn.close()
+
+    for user in users:
+        stored_username_hash = user[1]
+        if check_username_hash(stored_username_hash, username):
+            if check_password(user[2], password):
+                logging.info(f"User '{username}' successfully authenticated.")
+                return user
+    logging.warning(f"Authentication failed for user '{username}'.")
+    return None
+
+# Password and Username Hashing Functions
+
+def hash_password(password):
+    """
+    Hashes a password using bcrypt.
+
+    Args:
+        password (str): The password to be hashed.
+
+    Returns:
+        str: The hashed password.
+
+    Tests:
+        1. **Hash Generation**:
+            - Input: A sample password.
+            - Expected Outcome: Returns a bcrypt hash string.
+        2. **Different Hash for Same Password**:
+            - Input: Call the function twice with the same password.
+            - Expected Outcome: The two returned hashes should be different due to different salts.
+    """
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+def check_password(hashed_password, password):
+    """
+    Verifies a password against the hashed version.
+
+    Args:
+        hashed_password (str): The hashed password from the database.
+        password (str): The plain text password to verify.
+
+    Returns:
+        bool: True if the password matches, False otherwise.
+
+    Tests:
+        1. **Correct Password Verification**:
+            - Input: A correct password matching the hashed password.
+            - Expected Outcome: Returns True.
+        
+        2. **Incorrect Password Verification**:
+            - Input: A password that does not match the hashed password.
+            - Expected Outcome: Returns False.
+    """
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def hash_username(username):
+    """
+    Hashes the username using SHA-256.
+
+    Args:
+        username (str): The username to be hashed.
+
+    Returns:
+        str: The SHA-256 hash of the username.
+
+    Tests:
+        1. **Hash Generation**:
+            - Input: A valid username.
+            - Expected Outcome: Returns a SHA-256 hash string.
+        
+        2. **Consistency of Hash**:
+            - Input: Hash the same username multiple times.
+            - Expected Outcome: The same SHA-256 hash is returned each time.
+    """
+    return hashlib.sha256(username.encode('utf-8')).hexdigest()
+
+def check_username_hash(stored_hash, username):
+    """
+    Checks if the SHA-256 hash of the username matches the stored hash.
+
+    Args:
+        stored_hash (str): The stored hash value from the database.
+        username (str): The plain text username to verify.
+
+    Returns:
+        bool: True if the hash matches, False otherwise.
+
+    Tests:
+        1. **Matching Hashes**:
+            - Input: A username and its correct stored hash.
+            - Expected Outcome: Returns True.
+        
+        2. **Non-matching Hashes**:
+            - Input: A username and an incorrect hash.
+            - Expected Outcome: Returns False.
+    """
+    return stored_hash == hash_username(username)
+
+# Reading Streak Management Functions
+
+def update_reading_streak(user_id):
+    """
+    Updates the user's reading streak based on their last reading date.
+    
+    Args:
+        user_id (int): The ID of the user.
+    
+    Returns:
+        dict: A dictionary containing the user's updated current streak, longest streak, last read date, and streak status.
+
+    Tests:
+        1. **Streak Continued**:
+            - Input: The last read date was yesterday.
+            - Expected Outcome: The current streak is incremented, and the streak status is 'continued'.
+        
+        2. **Streak Reset**:
+            - Input: The last read date was more than a day ago.
+            - Expected Outcome: The current streak is reset to 1, and the streak status is 'reset'.
+    """
+    conn = connect_to_db()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("SELECT last_read_date, current_streak, longest_streak FROM users WHERE id = ?", (user_id,))
+        user_data = cur.fetchone()
+
+        last_read_date_str, current_streak, longest_streak = user_data if user_data else (None, 0, 0)
+        last_read_date = datetime.strptime(last_read_date_str, '%Y-%m-%d').date() if last_read_date_str else None
+
+        today = datetime.now().date()
+
+        if last_read_date == today:
+            streak_status = "unchanged"
+        elif last_read_date == today - timedelta(days=1):
+            current_streak += 1
+            streak_status = "continued"
+        else:
+            current_streak = 1
+            streak_status = "reset"
+
+        if current_streak > longest_streak:
+            longest_streak = current_streak
+
+        cur.execute(
+            "UPDATE users SET last_read_date = ?, current_streak = ?, longest_streak = ? WHERE id = ?",
+            (today.strftime('%Y-%m-%d'), current_streak, longest_streak, user_id)
+        )
+        conn.commit()
+
+        logging.info(f"User {user_id} streak updated: Current streak is {current_streak}, Longest streak is {longest_streak}, Status: {streak_status}.")
+        return {
+            "current_streak": current_streak,
+            "longest_streak": longest_streak,
+            "last_read_date": today,
+            "streak_status": streak_status
+        }
+
+    except sqlite3.Error as e:
+        logging.error(f"Database error while updating reading streak for user {user_id}: {e}")
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_read_date": None,
+            "streak_status": "error"
+        }
+    finally:
+        conn.close()
+
+def get_user_streak_data(user_id):
+    """
+    Retrieves the user's streak data from the database.
+    
+    Args:
+        user_id (int): The ID of the user.
+    
+    Returns:
+        dict: A dictionary containing 'current_streak', 'longest_streak', and 'last_read_date'.
+
+    Tests:
+        1. **Data Retrieval Success**:
+            - Input: A valid user ID with streak data.
+            - Expected Outcome: Returns the correct streak data (current streak, longest streak, last read date).
+        
+        2. **No Streak Data**:
+            - Input: A valid user ID without streak data.
+            - Expected Outcome: Returns 0 for streaks and None for last read date.
+    """
+    conn = connect_to_db()
     cur = conn.cursor()
     
-    # Fetch the user data matching the given username and password
-    cur.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
-    user = cur.fetchone()  # Returns a tuple: (id, username, password) or None
-    
-    conn.close()
-    
-    return user  # Return the user tuple or None if the user is not found
+    try:
+        cur.execute("SELECT current_streak, longest_streak, last_read_date FROM users WHERE id = ?", (user_id,))
+        result = cur.fetchone()
+        
+        if result:
+            current_streak, longest_streak, last_read_date = result
+            return {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "last_read_date": last_read_date
+            }
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_read_date": None
+        }
+    except sqlite3.Error as e:
+        logging.error(f"Error retrieving streak data for user {user_id}: {e}")
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_read_date": None
+        }
+    finally:
+        conn.close()
 
 ---------------------------------------------------------------------------------------------------------------------------------
     """
-Google Books API Module
+Google Books API Module  (google_book_api.py)
 
 - This module interacts with the Google Books API to search for books based on user input and retrieve book details using the ISBN.
 
@@ -624,6 +837,12 @@ License: Free
 """
 
 import requests
+import logging
+
+# Set up logging configuration
+logging.basicConfig(filename='application.log', 
+                    level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def search_books(field_of_interest, specific_topic):
     """
@@ -651,19 +870,19 @@ def search_books(field_of_interest, specific_topic):
         2. **Empty Specific Topic**:
             - Input: `field_of_interest = "Fiction"`, `specific_topic = ""`
             - Expected Outcome: The function should return a list of up to 10 dictionaries containing fiction books without any filtering by specific topic. The books should still have their details populated correctly.
-        
-        3. **No Results Found**:
-            - Input: `field_of_interest = "NonexistentCategory"`, `specific_topic = "MadeUpTopic"`
-            - Expected Outcome: The function should return an empty list `[]`, indicating that no books were found for the given search criteria.
-        
-        4. **Invalid API Response Handling**:
-            - Input: Simulate a scenario where the API returns an unexpected response format.
-            - Expected Outcome: The function should handle the error gracefully and not throw an exception. Instead, it should return an empty list or default values.
+      
     """
     query = f'{field_of_interest} {specific_topic}'
     url = f'https://www.googleapis.com/books/v1/volumes?q={query}'
-    response = requests.get(url)
-    data = response.json()
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        logging.info(f"Search query for '{query}' returned {len(data.get('items', []))} results.")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching books from Google Books API for query '{query}': {e}")
+        return []
 
     books = []
     for item in data.get('items', [])[:10]:  # Limit to 10 books
@@ -679,6 +898,7 @@ def search_books(field_of_interest, specific_topic):
             'category': field_of_interest  # Add the field of interest as the category
         })
 
+    logging.info(f"Successfully retrieved {len(books)} books for query '{query}'.")
     return books
 
 
@@ -706,26 +926,28 @@ def get_book_by_isbn(isbn):
         2. **Invalid ISBN**:
             - Input: `isbn = "0000000000000"` (An invalid or nonexistent ISBN)
             - Expected Outcome: The function should return `None`, indicating that no book was found for the given ISBN.
-        
-        3. **Empty ISBN**:
-            - Input: `isbn = ""`
-            - Expected Outcome: The function should return `None`, as an empty ISBN is not valid for searching.
-        
-        4. **Malformed API Response**:
-            - Input: Simulate a situation where the API returns an unexpected or malformed response.
-            - Expected Outcome: The function should not raise an exception but should return `None`, handling the unexpected response appropriately.
+      
     """
     url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
-    response = requests.get(url)
-    data = response.json()
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        logging.info(f"Search query for ISBN '{isbn}' returned {len(data.get('items', []))} results.")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching book details from Google Books API for ISBN '{isbn}': {e}")
+        return None
 
     # Check if 'items' is present in the response JSON
     if 'items' not in data:
+        logging.warning(f"No book found for ISBN '{isbn}'.")
         return None  # No results found
 
     item = data['items'][0]
     book_info = item.get('volumeInfo', {})
 
+    logging.info(f"Successfully retrieved book details for ISBN '{isbn}'.")
     return {
         'title': book_info.get('title', 'N/A'),
         'author': ', '.join(book_info.get('authors', ['N/A'])),
@@ -734,10 +956,11 @@ def get_book_by_isbn(isbn):
         'description': book_info.get('description', 'No description available')
     }
 
+
 ---------------------------------------------------------------------------------------------------------------------------------
 
 """
-Favorites Management Module
+Favorites Management Module json_storage.py)
 
 - This module provides functionality to manage users' favorite books using a JSON file for storage. 
 - Users can save their favorite books, add notes about their learning, update the current page they are on, and remove books from their favorites list.
@@ -750,9 +973,15 @@ License: Free
 
 import json
 import os
+import logging
 
 # Path to the JSON file for favorites
 FAVORITES_JSON_PATH = 'favorites.json'
+
+# Set up logging configuration
+logging.basicConfig(filename='application.log', 
+                    level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def load_all_favorites():
@@ -771,18 +1000,21 @@ def load_all_favorites():
         2. **File Does Not Exist**:
             - Input: A scenario where the JSON file does not exist.
             - Expected Outcome: The function should return an empty dictionary.
-        
-        3. **Corrupted JSON File**:
-            - Input: A corrupted JSON file (e.g., missing brackets).
-            - Expected Outcome: The function should catch the JSONDecodeError and return an empty dictionary.
+  
     """
     if not os.path.exists(FAVORITES_JSON_PATH):
+        logging.warning(f"{FAVORITES_JSON_PATH} does not exist.")
         return {}
 
     try:
         with open(FAVORITES_JSON_PATH, 'r') as file:
+            logging.info(f"Loaded favorites from {FAVORITES_JSON_PATH}.")
             return json.load(file)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logging.error(f"Error decoding JSON file {FAVORITES_JSON_PATH}: {e}")
+        return {}
+    except IOError as e:
+        logging.error(f"Failed to read file {FAVORITES_JSON_PATH}: {e}")
         return {}
 
 
@@ -806,7 +1038,9 @@ def load_user_favorites(user_id):
             - Expected Outcome: The function should return an empty list.
     """
     all_favorites = load_all_favorites()
-    return all_favorites.get(str(user_id), [])
+    favorites = all_favorites.get(str(user_id), [])
+    logging.info(f"Loaded {len(favorites)} favorites for user {user_id}.")
+    return favorites
 
 
 def save_favorite(user_id, book_details):
@@ -840,9 +1074,15 @@ def save_favorite(user_id, book_details):
     if not existing_book:
         all_favorites[str(user_id)].append(book_details)
 
-        # Write the updated favorites back to the JSON file
-        with open(FAVORITES_JSON_PATH, 'w') as file:
-            json.dump(all_favorites, file, indent=4)
+        try:
+            # Write the updated favorites back to the JSON file
+            with open(FAVORITES_JSON_PATH, 'w') as file:
+                json.dump(all_favorites, file, indent=4)
+            logging.info(f"Book {book_details['title']} added to favorites for user {user_id}.")
+        except IOError as e:
+            logging.error(f"Failed to save favorite book for user {user_id}: {e}")
+    else:
+        logging.info(f"Book {book_details['title']} already exists in favorites for user {user_id}.")
 
 
 def save_favorite_learning(user_id, book_isbn, learning):
@@ -873,11 +1113,17 @@ def save_favorite_learning(user_id, book_isbn, learning):
         for book in all_favorites[str(user_id)]:
             if book['isbn'] == book_isbn:
                 book['learning'] = learning
+                logging.info(f"Updated learning for book {book['title']} (ISBN: {book_isbn}) for user {user_id}.")
                 break
 
-        # Write the updated favorites back to the JSON file
-        with open(FAVORITES_JSON_PATH, 'w') as file:
-            json.dump(all_favorites, file, indent=4)
+        try:
+            # Write the updated favorites back to the JSON file
+            with open(FAVORITES_JSON_PATH, 'w') as file:
+                json.dump(all_favorites, file, indent=4)
+        except IOError as e:
+            logging.error(f"Failed to save learning for book {book_isbn} for user {user_id}: {e}")
+    else:
+        logging.warning(f"Book with ISBN {book_isbn} not found in favorites for user {user_id}.")
 
 
 def remove_favorites(user_id, selected_isbns):
@@ -903,14 +1149,23 @@ def remove_favorites(user_id, selected_isbns):
     all_favorites = load_all_favorites()
 
     if str(user_id) in all_favorites:
+        initial_count = len(all_favorites[str(user_id)])
         # Filter out the books whose ISBN is in the selected_isbns list
         all_favorites[str(user_id)] = [
             book for book in all_favorites[str(user_id)] if book['isbn'] not in selected_isbns
         ]
 
-        # Write the updated favorites back to the JSON file
-        with open(FAVORITES_JSON_PATH, 'w') as file:
-            json.dump(all_favorites, file, indent=4)
+        final_count = len(all_favorites[str(user_id)])
+        logging.info(f"Removed {initial_count - final_count} books from favorites for user {user_id}.")
+
+        try:
+            # Write the updated favorites back to the JSON file
+            with open(FAVORITES_JSON_PATH, 'w') as file:
+                json.dump(all_favorites, file, indent=4)
+        except IOError as e:
+            logging.error(f"Failed to remove favorites for user {user_id}: {e}")
+    else:
+        logging.warning(f"No favorites found for user {user_id}.")
 
 
 def update_favorite_page(user_id, book_isbn, current_page):
@@ -937,31 +1192,118 @@ def update_favorite_page(user_id, book_isbn, current_page):
     all_favorites = load_all_favorites()
 
     if str(user_id) in all_favorites:
-        # Find the book by its ISBN and update the current page number
         for book in all_favorites[str(user_id)]:
             if book['isbn'] == book_isbn:
                 book['current_page'] = current_page
+                logging.info(f"Updated current page to {current_page} for book {book['title']} (ISBN: {book_isbn}) for user {user_id}.")
                 break
 
-        # Write the updated favorites back to the JSON file
-        with open(FAVORITES_JSON_PATH, 'w') as file:
-            json.dump(all_favorites, file, indent=4)
+        try:
+            # Write the updated favorites back to the JSON file
+            with open(FAVORITES_JSON_PATH, 'w') as file:
+                json.dump(all_favorites, file, indent=4)
+        except IOError as e:
+            logging.error(f"Failed to update page for book {book_isbn} for user {user_id}: {e}")
+    else:
+        logging.warning(f"Book with ISBN {book_isbn} not found in favorites for user {user_id}.")
+
 
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 """
-Database Initialization Module
+Database Initialization Module  (initialize_db.py)
 
-- This module is responsible for initializing the database by creating the necessary tables.
-
-Author: Paul, Tim, Thang
-Date: 06.10.2024
-Version: 0.1.0
-License: Free
-"""
-
+import logging
 import database
 
-# This function creates the necessary tables
-database.create_tables()
-print("Database tables were successfully created")
+# Configure logging
+logging.basicConfig(
+    filename='app.log', 
+    level=logging.INFO, 
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+def create_database_tables():
+"""
+Tests:
+    1. **Successful Table Creation**:
+        - Input: A valid database connection and proper table creation functions (`create_user_table`).
+        - Expected Outcome: The tables should be successfully created in the database, and an info message should be logged indicating success.
+    
+    2. **Table Creation Failure**:
+        - Input: A scenario where the table creation function (`create_user_table`) fails, such as due to a database connection issue.
+        - Expected Outcome: An error should be logged with a detailed message indicating the failure.
+"""
+
+    try:
+        # This function creates the necessary tables
+        database.create_user_table()
+        logging.info("Database tables were successfully created.")
+    except Exception as e:
+        logging.error(f"An error occurred while creating database tables: {e}")
+
+# Run the function to create tables
+create_database_tables()
+
+----------------------------------------------------------------------------------------------------------------------
+(test.py)
+import sqlite3
+
+def show_all_data():
+
+"""
+Tests:
+    1. **Successful Database Connection**:
+        - Input: A valid SQLite database file ('database.db').
+        - Expected Outcome: The function should establish a connection to the database without raising any exceptions.
+        
+    2. **Fetch All Users**:
+        - Input: A non-empty `users` table in the database.
+        - Expected Outcome: The function should retrieve and print all rows from the `users` table.
+
+"""
+    conn = sqlite3.connect('database.db')  # Ersetze 'database.db' mit deinem Datenbanknamen
+    cur = conn.cursor()
+
+    # Beispielabfrage, um alle Benutzer anzuzeigen
+    cur.execute("SELECT * FROM users")
+    rows = cur.fetchall()
+
+    for row in rows:
+        print(row)
+
+    conn.close()
+
+import os
+
+def delete_database(db_name='database.db'):
+    """
+    Deletes the SQLite database file if it exists.
+
+    Args:
+        db_name (str): The name of the database file to delete.
+
+    Test: 
+     1. **Successful Deletion**:
+        - Input: An existing SQLite database file ('database.db').
+        - Expected Outcome: The database file should be successfully deleted, and a confirmation message should be printed.
+        
+    2. **Nonexistent Database File**:
+        - Input: A database file that does not exist ('database.db').
+        - Expected Outcome: The function should print a message indicating that the file does not exist and handle it gracefully without errors.
+    
+    """
+    try:
+        if os.path.exists(db_name):
+            os.remove(db_name)
+            print(f"Database '{db_name}' deleted successfully.")
+        else:
+            print(f"Database '{db_name}' does not exist.")
+    except Exception as e:
+        print(f"Error deleting the database: {e}")
+
+
+if __name__ == "__main__":
+    show_all_data()
+
+
