@@ -77,8 +77,8 @@
    - Welcome message: A brief introductory message welcoming users to the virtual library.
    - Streaks: Reading streak of the user is displayed
 3. Search result page
-   - Search input fields: 2 text boxes for users to enter their search query including field of expertise and more specifically a theme
-   - Search button labeled "Suchen initiates the search
+   - Search input fields: 2 text boxes for users to enter their search query including field of expertise and topic
+   - Search button labeled "Suchen" initiates the search
    - Results display: a section that lists the search results, including:
       - Book titles
       - Authors
@@ -99,95 +99,93 @@
    - Add Learning Note: An input field for entering a new learning note and an "Speichern" button to save it.
 
 ## Test Section
-Navigation Tests
+- Navigation Tests
 
-Test 1: Navigation Links Exist
+Test: Navigation Links Exist
 Description: Verify that all navigation links (Startseite, Bücher suchen, Favoriten, Lesezeichen, Learnings) are present in the navigation bar.
 Expected Result: All links should be visible and functional.
 
-Test 2: Logout Link Visibility
+Test: Logout Link Visibility
 Description: Verify that the logout link appears when the user is logged in.
 Expected Result: The logout link should be visible.
 
-Test 3: Login and Register Links Visibility
+Test: Login and Register Links Visibility
 Description: Verify that the login and register links are displayed when the user is not logged in.
 Expected Result: Both links should be visible.
 
-Home Page Tests
+- Home Page Tests
 
-Test 4: Home Page Loads Correctly
+Test: Home Page Loads Correctly
 Description: Verify that the home page displays the correct title and introductory message.
 Expected Result: The title should be "Willkommen in Ihrer virtuellen Lernbibliothek."
 
-Test 5: Content Display on Home Page
+Test: Content Display on Home Page
 Description: Check that relevant content is displayed on the home page.
 Expected Result: The main content area should show welcome information and any featured sections.
-Search Functionality Tests
 
-Test 6: Search Functionality
-Description: Input a book title in the search bar and click the search button.
+- Search Functionality Tests
+
+Test: Search Functionality
+Description: Input the field of expertise along with the topic in the search bar and click the search button.
 Expected Result: The search results should display books matching the search criteria.
 
-Test 7: No Results Found
-Description: Search for a title that does not exist in the database.
-Expected Result: A message indicating no results found should be displayed.
-
-Test 8: More Info Button in Search Results
+Test: More Info Button in Search Results
 Description: Click the "Mehr Infos" button for a book in the search results.
 Expected Result: Additional information for that book should be displayed.
 
-Favorites Tests
+- Favorites Tests
 
-Test 9: Adding a Book to Favorites
+Test: Adding a Book to Favorites
 Description: Click the button to add a book to favorites from the search results.
 Expected Result: The book should appear in the favorites section.
 
-Test 10: Display of Favorites List
+Test: Display of Favorites List
 Description: Navigate to the favorites page and check that the list of favorite books displays correctly.
 Expected Result: All added favorites should be displayed with relevant details.
 
-Test 11: Filtering Favorites
+Test: Filtering Favorites
 Description: Select a category from the filter dropdown and click the "Filtern" button.
 Expected Result: The favorites list should refresh and show only the books that match the selected category.
 
-Test 12: Removing a Book from Favorites
+Test: Removing a Book from Favorites
 Description: Click the remove button for a favorite book.
 Expected Result: The book should no longer appear in the favorites list.
-Learning Management Tests
 
-Test 13: Adding Learning Notes
+- Learning Management Tests
+
+Test: Adding Learning Notes
 Description: Input a new learning note and click the add button.
 Expected Result: The note should appear in the learning section.
 
-Test 14: Display Learning Notes
+Test: Display Learning Notes
 Description: Navigate to the learnings page and check that all notes are displayed correctly.
-Expected Result: The learning notes should show the title and content of each note.
+Expected Result: The learning notes should show content of each note.
 
-Test 15: Updating Learning Notes
+Test: Updating Learning Notes
 Description: Click the update button for a learning note and change the content.
 Expected Result: The updated content should be displayed after submission.
 
-Book Management Tests
+- Book Management Tests
 
-Test 16: Updating Current Page of a Favorite Book
+Test: Updating Current Page of a Favorite Book
 Description: Input a new page number for a favorite book and click the "Aktualisieren" button.
 Expected Result: The page should reload, and the book's current page should reflect the updated value.
 
-Test 17: Incorrect Page Number Submission
+Test: Incorrect Page Number Submission
 Description: Input an invalid page number (e.g., negative or non-numeric) and submit.
 Expected Result: An error message should indicate invalid input.
 
-Layout and Design Tests
+- Layout and Design Tests
 
-Test 18: Responsive Design Check
+Test: Responsive Design Check
 Description: Resize the browser window and verify that the layout adapts correctly on different screen sizes.
 Expected Result: The layout should remain user-friendly and functional on all screen sizes.
 
-Test 19: Font and Styling Verification
+Test: Font and Styling Verification
 Description: Check that the specified fonts and styles are applied throughout the app.
 Expected Result: The app should display consistent styling as defined in the CSS.
 
-Test 20: Button Visibility and Functionality
+Test: Button Visibility and Functionality
 Description: Verify that all buttons (e.g., "Aktualisieren," "Filtern," "Mehr Infos") are visible and functional.
 Expected Result: Each button should respond to user interactions as intended.
 
