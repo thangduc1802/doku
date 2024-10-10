@@ -1,5 +1,5 @@
 """
-Book Recommendation App
+Book Recommendation App (app.py)
 
 - This Flask application serves as a front-end for a book recommendation system. 
 - Users can register, log in, search for books using the Google Books API, and save their favorites. 
@@ -58,6 +58,11 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     """
+    Handles user registration.
+
+    Returns:
+        Redirects to the login page after successful registration or displays the registration form for GET requests.
+        
     Tests:
         1. **Successful Registration**:
             - Input: A valid username and password.
@@ -81,6 +86,10 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """
+    Handles user login.
+
+    Returns:
+      Redirects to the homepage upon successful login or displays the login form for GET requests.
     Tests:
         1. **Successful Login**:
             - Input: Valid username and password.
@@ -106,6 +115,11 @@ def login():
 @app.route('/streaks')
 def streaks():
     """
+    Displays the user's reading streaks.
+    
+    Returns:
+        Rendered streaks page (streaks.html) for logged-in users, or redirects unauthorized users to the login page.
+        
     Tests:
         1. **Logged-in User Access**:
             - Input: A logged-in user attempts to access the streaks page.
@@ -125,6 +139,11 @@ def streaks():
 @app.route('/logout')
 def logout():
     """
+    Handles user logout.
+    
+    Returns:
+        Redirects to the homepage after clearing the session.
+        
     Tests:
         1. **Successful Logout**:
             - Input: A logged-in user clicks the logout button.
@@ -150,7 +169,6 @@ def search():
     Returns:
         Renders the search results page if successful or the search form for a GET request.
 
-    """
     Tests:
         1. **Search Query**:
             - Input: A logged-in user submits a search form with a field of interest and topic.
@@ -159,7 +177,7 @@ def search():
         2. **Unauthorized Access**:
             - Input: A user tries to access the search page without logging in.
             - Expected Outcome: The user is redirected to the login page with a warning logged.
-    """
+
     """
     if 'user_id' not in session:
         logging.warning("Unauthorized access to search page.")
@@ -485,6 +503,7 @@ def connect_to_db():
 
     Returns:
         Connection object: SQLite connection to 'database.db'.
+        
     Tests:
         1. **Successful Connection**:
             - Input: Valid database file (existing 'database.db').
@@ -1211,7 +1230,15 @@ def update_favorite_page(user_id, book_isbn, current_page):
 ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 """
-Database Initialization Module  (initialize_db.py)
+Database Initialization Module (initialize_db.py)
+
+- This module is responsible for initializing the database by creating the necessary tables for the application.
+
+Author: Paul, Tim, Thang
+Date: 06.10.2024
+Version: 0.1.0
+License: Free
+"""
 
 import logging
 import database
@@ -1225,6 +1252,8 @@ logging.basicConfig(
 
 def create_database_tables():
 """
+Creates the necessary tables for the application by calling the relevant functions in the database module.
+
 Tests:
     1. **Successful Table Creation**:
         - Input: A valid database connection and proper table creation functions (`create_user_table`).
@@ -1246,18 +1275,30 @@ Tests:
 create_database_tables()
 
 ----------------------------------------------------------------------------------------------------------------------
-(test.py)
+"""
+Test Module (test.py)
+
+- This module provides functions to interact with the SQLite database, including displaying all user data and deleting the database file.
+
+Author: Paul, Tim, Thang
+Date: 06.10.2024
+Version: 0.1.0
+License: Free
+"""
+
 import sqlite3
+import os
 
 def show_all_data():
+    """
+    Displays all user data from the 'users' table in the database.
 
-"""
-Tests:
-    1. **Successful Database Connection**:
+    Tests:
+      1. **Successful Database Connection**:
         - Input: A valid SQLite database file ('database.db').
         - Expected Outcome: The function should establish a connection to the database without raising any exceptions.
         
-    2. **Fetch All Users**:
+      2. **Fetch All Users**:
         - Input: A non-empty `users` table in the database.
         - Expected Outcome: The function should retrieve and print all rows from the `users` table.
 
