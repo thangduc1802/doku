@@ -99,7 +99,7 @@
    - Add Learning Note: An input field for entering a new learning note and an "Speichern" button to save it.
 
 ## Test Section
-- Navigation Tests
+1.  Navigation Tests
 
 Test: Navigation Links Exist
   - Description: Verify that all navigation links (Startseite, Bücher suchen, Favoriten, Lesezeichen, Learnings) are present in the navigation bar.
@@ -113,7 +113,7 @@ Test: Login and Register Links Visibility
   - Description: Verify that the login and register links are displayed when the user is not logged in.
   - Expected Result: Both links should be visible.
 
-- Home Page Tests
+2. Home Page Tests
 
 Test: Home Page Loads Correctly
   - Description: Verify that the home page displays the correct title and introductory message.
@@ -123,7 +123,7 @@ Test: Content Display on Home Page
   - Description: Check that relevant content is displayed on the home page.
   - Expected Result: The main content area should show welcome information and any featured sections.
 
-- Search Functionality Tests
+3.  Search Functionality Tests
 
 Test: Search Functionality
   - Description: Input the field of expertise along with the topic in the search bar and click the search button.
@@ -133,7 +133,7 @@ Test: More Info Button in Search Results
   - Description: Click the "Mehr Infos" button for a book in the search results.
   - Expected Result: Additional information for that book should be displayed.
 
-- Favorites Tests
+4.  Favorites Tests
 
 Test: Adding a Book to Favorites
   - Description: Click the button to add a book to favorites from the search results.
@@ -151,7 +151,7 @@ Test: Removing a Book from Favorites
   - Description: Click the remove button for a favorite book.
   - Expected Result: The book should no longer appear in the favorites list.
 
-- Learning Management Tests
+5.  Learning Management Tests
 
 Test: Adding Learning Notes
   - Description: Input a new learning note and click the add button.
@@ -165,7 +165,7 @@ Test: Updating Learning Notes
   - Description: Click the update button for a learning note and change the content.
   - Expected Result: The updated content should be displayed after submission.
 
-- Book Management Tests
+6.  Book Management Tests
 
 Test: Updating Current Page of a Favorite Book
   - Description: Input a new page number for a favorite book and click the "Aktualisieren" button.
@@ -175,7 +175,7 @@ Test: Incorrect Page Number Submission
   - Description: Input an invalid page number (e.g., negative or non-numeric) and submit.
   - Expected Result: An error message should indicate invalid input.
 
-- Layout and Design Tests
+7.  Layout and Design Tests
 
 Test: Responsive Design Check
   - Description: Resize the browser window and verify that the layout adapts correctly on different screen sizes.
